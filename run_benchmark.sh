@@ -569,8 +569,9 @@ reduce_single_genome_to_crispr_region() {
     local genome_file="${GENOMES_FOLDER}/${id}.fasta"
     local padding_to_include_surrounding_crispr_region=10000
 
-    local full_genome_file_backup="${GENOMES_FOLDER}/${id}_full_genome.fasta"
-    cp "$genome_file" "$full_genome_file_backup" >/dev/null 2>&1
+    # # Save the full genome:
+    # local full_genome_file_backup="${GENOMES_FOLDER}/${id}_full_genome.fasta"
+    # cp "$genome_file" "$full_genome_file_backup" >/dev/null 2>&1
 
     if [ ! -f "$genome_file" ]; then
         echo "Error: Genome file '$genome_file' does not exist for ID: $id"
@@ -767,7 +768,11 @@ main() {
 
     echo ""
     echo "----------------------------------------------------"
-    echo "🔹RUN🔹"
+    if [ "$QUICK" = true ]; then
+        echo "🔹RUN QUICKLY🔹"
+    else
+        echo "🔹RUN🔹"
+    fi
     echo "----------------------------------------------------"
     
     local samples_done=0
@@ -798,6 +803,8 @@ main() {
         
         samples_done=$((samples_done + bucket_size))
     done
+
+    return 0
 }
 
 main "$@"
