@@ -733,10 +733,10 @@ run_mcaat_benchmark() {
     BUCKET_IDS=$(echo "$successful_ids" | xargs)
 
     if [ "$success_count" -ne 0 ]; then
-        echo "    ▸ ✔️  Generated ${success_count}/${total_count} reads"
+        echo "    ▸ ✔️  Executed mcaat ${success_count}/${total_count}"
         return 0
     else
-        echo "    ▸ ❌  Generated ${success_count}/${total_count} reads"
+        echo "    ▸ ❌  Executed mcaat ${success_count}/${total_count}"
         return 1
     fi
 }
