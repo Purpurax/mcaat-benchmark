@@ -132,6 +132,7 @@ setting_up_environment() {
     GENOMES_FOLDER="${OUTPUT_FOLDER}/genomes"
     READS_FOLDER="${OUTPUT_FOLDER}/reads"
     EXPECTED_CRISPRS_FOLDER="${OUTPUT_FOLDER}/crispr_sequences"
+    MCAAT_EXECUTION_FOLDER="${OUTPUT_FOLDER}/mcaat_runs"
     RESULTS_FOLDER="${OUTPUT_FOLDER}/results"
 
     for folder in "$OUTPUT_FOLDER" "$GENOMES_FOLDER" "$READS_FOLDER" "$EXPECTED_CRISPRS_FOLDER" "$RESULTS_FOLDER"; do
@@ -743,10 +744,11 @@ run_single_mcaat_benchmark() {
     local id="$1"
     local r1_file="${READS_FOLDER}/${id}_reads_R1.fastq"
     local r2_file="${READS_FOLDER}/${id}_reads_R2.fastq"
+    local mcaat_output_folder="${MCAAT_EXECUTION_FOLDER}/${id}"
     local crispr_sequences_file="${EXPECTED_CRISPRS_FOLDER}/${id}.txt"
     local result_file="${RESULTS_FOLDER}/${id}.txt"
 
-    if "$MCAAT_BINARY" --input-files "$r1_file" "$r2_file" --ram "$RAM" --threads "$THREADS" --benchmark "$crispr_sequences_file" > "$result_file" 2>&1; then
+    if "$MCAAT_BINARY" --input-files "$r1_file" "$r2_file" --ram "$RAM" --threads "$THREADS" --output-folder "$mcaat_output_folder" --benchmark "$crispr_sequences_file" > "$result_file" 2>&1; then
         return 0
     else
         echo "Failed to execute mcaat binary with arguments"
