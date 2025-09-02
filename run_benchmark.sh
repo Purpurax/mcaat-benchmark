@@ -648,13 +648,13 @@ run_mcaat_benchmark() {
             ((total_count++))
 
             if run_single_mcaat_benchmark "$id"; then
-                echo "  ▸ Successfully downloaded genome for ID: $id"
+                echo "  ▸ Successfully ran benchmark for ID: $id"
 
                 ((success_count++))
 
                 successful_ids="$successful_ids $id"
             else
-                echo "  ▸ Failed to download genome for ID: $id"
+                echo "  ▸ Failed to run benchmark for ID: $id"
             fi
         fi
     done

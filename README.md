@@ -76,24 +76,25 @@ psql -U crispr_user -d crispr_cas_db
 
 ```sql
 COPY (
-    SELECT s.id, s.length, s.description, s.genbank, COUNT(*) as crispr_count, 
-           string_agg('(' || c.start || '_' || c.length || ')', ';') as crispr_region
-    FROM crisprlocus c
-    JOIN (
-        SELECT sequence.id, sequence.length, sequence.description, strain.genbank
-        FROM sequence
-        JOIN strain ON strain.id = sequence.strain
-    ) as s ON c.sequence = s.id
-    GROUP BY s.id, s.length, s.description, s.genbank
-    HAVING COUNT(*) > 0
-    ORDER BY crispr_count DESC
+   SELECT s.id, s.length, s.description, s.genbank, COUNT(*) as crispr_count, string_agg('(' || c.start || '_' || c.length || ')', ';') as crispr_region
+   FROM crisprlocus c
+   JOIN (
+      SELECT sequence.id, sequence.length, sequence.description, strain.genbank
+      FROM sequence
+      JOIN strain ON strain.id = sequence.strain
+   ) as s
+   ON c.sequence = s.id
+   where c.evidencelevel = 4
+   GROUP BY s.id, s.length, s.description, s.genbank
+   HAVING COUNT(*) > 0
+   ORDER BY crispr_count desc
 ) TO '/tmp/genome_crispr_combination.csv'
 WITH CSV HEADER;
 ```
 
 Move the generated file to your working directory:
 ```bash
-mv /tmp/genome_crispr_combination.csv ./genome_crispr_combination.csv
+cp /tmp/genome_crispr_combination.csv ./genome_crispr_combination.csv
 ```
 
 ### 4. Compile MCAAT
