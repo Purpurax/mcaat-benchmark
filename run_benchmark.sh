@@ -34,7 +34,6 @@ verify_requirements() {
     fi
 
     if ! command -v datasets >/dev/null 2>&1; then
-    # if ! command -v /home/master/Documents/UNI/Semester-4/Bachelor/mcaat/data/crispr_db/datasets >/dev/null 2>&1; then
         echo "Error: 'datasets' not found, please install on https://github.com/ncbi/datasets"
         exit 1
     fi
@@ -252,7 +251,6 @@ download_single_genome() {
     # Download full fasta file
     local fasta_file
     if datasets download genome accession "$genbank" --include genome --filename $genome_zip; then
-    # if /home/master/Documents/UNI/Semester-4/Bachelor/mcaat/data/crispr_db/datasets download genome accession "$genbank" --include genome --filename $genome_zip; then
         if unzip -q "${genome_zip}" -d "$genome_tmp_unzipped_folder"; then
             rm -f "${genome_zip}"
 
