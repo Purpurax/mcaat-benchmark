@@ -135,7 +135,7 @@ setting_up_environment() {
     MCAAT_EXECUTION_FOLDER="${OUTPUT_FOLDER}/mcaat_runs"
     RESULTS_FOLDER="${OUTPUT_FOLDER}/results"
 
-    for folder in "$OUTPUT_FOLDER" "$GENOMES_FOLDER" "$READS_FOLDER" "$EXPECTED_CRISPRS_FOLDER" "$RESULTS_FOLDER"; do
+    for folder in "$OUTPUT_FOLDER" "$GENOMES_FOLDER" "$READS_FOLDER" "$EXPECTED_CRISPRS_FOLDER" "$RESULTS_FOLDER" "$MCAAT_EXECUTION_FOLDER"; do
         if [ ! -d "$folder" ]; then
             mkdir -p "$folder"
             if [ $? -eq 0 ]; then
@@ -803,6 +803,8 @@ main() {
         
         samples_done=$((samples_done + bucket_size))
     done
+
+    echo "------------------------DONE------------------------"
 
     return 0
 }
