@@ -12,7 +12,7 @@ This tool automates the process of:
 - **Operating System**: Linux (tested on Ubuntu 20.04+)
 - **PostgreSQL**: Version 12 or higher
 - **Memory**: Minimum 4GB RAM (8GB+ recommended)
-- **Storage**: At least 10GB free space for genome downloads and read generation
+- **Storage**: At least 1GB free space for genome downloads and read generation
 
 ## Setup Instructions
 ### 1. Install Required Dependencies
@@ -121,42 +121,36 @@ You'll need the binary executable for the benchmarking process.
 #### Benchmark Specific Genomes
 ```bash
 # Benchmark specific genome IDs
-./run_benchmark.sh ./mcaat genome_crispr_combination.csv --ids 12345 67890 --threads 4 --ram 8G
+./run_benchmark.sh ./mcaat genome_crispr_combination.csv --ids 1f29f0f6-bd5e-443e-a2b7-794b96acd1cf db9f6777-4a29-4519-af5d-53079df31eef --threads 4 --ram 8G
 
 # Quick benchmark with reduced genome size
-./run_benchmark.sh ./mcaat genome_crispr_combination.csv --ids 12345 --quick --output_folder quick_test
+./run_benchmark.sh ./mcaat genome_crispr_combination.csv --ids db9f6777-4a29-4519-af5d-53079df31eef --quick --output_folder quick_test
 ```
 
 #### Random Sampling
 ```bash
 # Benchmark 5 random genomes
-./run_benchmark.sh ./mcaat genome_crispr_combination.csv --ids 5 --threads 8
+./run_benchmark.sh ./mcaat genome_crispr_combination.csv --threads 8 --ids 5
 
 # Quick benchmark of 10 random genomes
-./run_benchmark.sh ./mcaat genome_crispr_combination.csv --ids 10 --quick --ram 16G
+./run_benchmark.sh ./mcaat genome_crispr_combination.csv --quick --ram 16G --ids 10
 ```
 
 #### Production Benchmarking
 ```bash
 # Comprehensive benchmark with high resources
-./run_benchmark.sh ./mcaat genome_crispr_combination.csv --ids 50 --threads 16 --ram 32G --output_folder production_benchmark
+./run_benchmark.sh ./mcaat genome_crispr_combination.csv --threads 16 --ram 32G --output_folder production_benchmark --ids 50
 ```
 
 ### Output Structure
 The tool creates the following directory structure:
 ```
 benchmark/
+├── crispr_sequences/  # Expected CRISPR sequences extracted from genomes
 ├── genomes/           # Downloaded genome FASTA files
 ├── reads/             # Artificially generated sequencing reads
-├── crispr_sequences/  # Expected CRISPR sequences extracted from genomes
 └── results/           # MCAAT benchmark results and performance metrics
 ```
-
-### Performance Considerations
-- **Quick Mode**: Reduces genome size to regions around CRISPR arrays, significantly faster but may miss some edge cases
-- **Memory Usage**: Adjust `--ram` based on your system capabilities
-- **Thread Count**: Optimal thread count is typically equal to your CPU cores
-- **Storage**: Each genome with reads can require 1-5GB of storage
 
 ## Troubleshooting
 ### Common Issues
