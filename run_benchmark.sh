@@ -23,11 +23,6 @@ usage() {
 }
 
 verify_requirements() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP $1: Verifying requirements"
-    echo "----------------------------------------------------"
-
     if ! command -v unzip >/dev/null 2>&1; then
         echo "Error: 'unzip' not found, please install over apt-get install unzip"
         exit 1
@@ -45,12 +40,6 @@ verify_requirements() {
 }
 
 verify_arguments() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP $1: Verifying arguments"
-    echo "----------------------------------------------------"
-    
-    shift 1
     if [ "$#" -lt 4 ]; then
         usage
         exit 1
@@ -63,14 +52,14 @@ verify_arguments() {
         echo "Error: mcaat binary file '$MCAAT_BINARY' not found"
         exit 1
     else
-        echo "  ▸ mcaat binary file was found"
+        echo "  ▸ File mcaat binary was found"
     fi
 
     if [ ! -f "$GENOME_CRISPR_CSV" ]; then
         echo "Error: genome_crispr_combination.csv file '$GENOME_CRISPR_CSV' not found"
         exit 1
     else
-        echo "  ▸ genome_crispr_combination csv was found"
+        echo "  ▸ File genome_crispr_combination.csv was found"
     fi
 
     RAM=$(free -m | awk 'NR==2{printf "%.0fM", $7*0.8}')
@@ -91,7 +80,7 @@ verify_arguments() {
                     exit 1
                 fi
                 RAM="$2"
-                echo "    ▸ ram is set to $RAM"
+                echo "    ▸ RAM is set to $RAM"
                 shift 2
                 ;;
             --threads)
@@ -100,7 +89,7 @@ verify_arguments() {
                     exit 1
                 fi
                 THREADS="$2"
-                echo "    ▸ threads are set to $THREADS"
+                echo "    ▸ Threads are set to $THREADS"
                 shift 2
                 ;;
             --output_folder)
@@ -109,12 +98,12 @@ verify_arguments() {
                     exit 1
                 fi
                 OUTPUT_FOLDER="$2"
-                echo "    ▸ outputting data in $OUTPUT_FOLDER"
+                echo "    ▸ Outputting data in $OUTPUT_FOLDER"
                 shift 2
                 ;;
             --quick)
                 QUICK=true
-                echo "    ▸ quick mode enabled"
+                echo "    ▸ Quick mode enabled"
                 shift
                 ;;
             --ids)
@@ -123,7 +112,7 @@ verify_arguments() {
                     IDS="$IDS $1"
                     shift
                 done
-                echo "    ▸ benchmarking ids $IDS"
+                echo "    ▸ Benchmarking ids $IDS"
                 ;;
             *)
                 echo "Error: Unknown argument '$1'"
@@ -140,42 +129,95 @@ verify_arguments() {
 }
 
 setting_up_environment() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP $1: Setting up environemnt"
-    echo "----------------------------------------------------"
-
     GENOMES_FOLDER="${OUTPUT_FOLDER}/genomes"
     READS_FOLDER="${OUTPUT_FOLDER}/reads"
     EXPECTED_CRISPRS_FOLDER="${OUTPUT_FOLDER}/crispr_sequences"
     RESULTS_FOLDER="${OUTPUT_FOLDER}/results"
-    # Ensure all required folders are created
+
     for folder in "$OUTPUT_FOLDER" "$GENOMES_FOLDER" "$READS_FOLDER" "$EXPECTED_CRISPRS_FOLDER" "$RESULTS_FOLDER"; do
         if [ ! -d "$folder" ]; then
             mkdir -p "$folder"
             if [ $? -eq 0 ]; then
-                echo "  ▸ Created folder: ${folder}"
+                echo "  ▸ Created folder: $folder"
             else
-                echo "Error: Failed to create folder '${folder}'"
+                echo "Error: Failed to create folder '$folder'"
                 exit 1
             fi
         else
-            echo "  ▸ Folder exists: ${folder}"
+            echo "  ▸ Folder exists: $folder"
         fi
     done
 
     if echo "$IDS" | grep -Eq '^[[:space:]]*[0-9]+[[:space:]]*$'; then
-        num_samples=$(echo "$IDS" | tr -d '[:space:]')
+        NUM_SAMPLES=$(echo "$IDS" | tr -d '[:space:]')
         echo "  ▸ Converting numeric IDS to random samples"
-        local num_samples="$IDS"
-        IDS=""
-        for ((i=1; i<=num_samples; i++)); do
-            local sample_id=$(get_random_id_sample)
-            IDS="$IDS $sample_id"
-        done
+        
+        local total_lines=$(wc -l < "$GENOME_CRISPR_CSV")
+        local available_samples=$((total_lines - 2))
+        
+        if [ "$NUM_SAMPLES" -ge "$available_samples" ]; then
+            IDS=$(tail -n +2 "$GENOME_CRISPR_CSV" | awk -F',' 'NF > 0 && $1 != "" {print $1}' | tr '\n' ' ')
+            NUM_SAMPLES=$available_samples
+        else
+            IDS=""
+            local selected_ids=()
+            local attempts=0
+            local max_attempts=$((NUM_SAMPLES * 10))
+            
+            while [ ${#selected_ids[@]} -lt $NUM_SAMPLES ] && [ $attempts -lt $max_attempts ]; do
+                local random_line_num=$((RANDOM % (total_lines - 1) + 2))
+                local sample_id=$(sed -n "${random_line_num}p" "$GENOME_CRISPR_CSV" | awk -F',' '{print $1}' | xargs)
+                
+                local found=false
+                for selected in "${selected_ids[@]}"; do
+                    if [ "$selected" = "$sample_id" ]; then
+                        found=true
+                        break
+                    fi
+                done
+                
+                if [ "$found" = false ]; then
+                    selected_ids+=("$sample_id")
+                else
+                    local current_line=$random_line_num
+                    while true; do
+                        current_line=$((current_line + 1))
+                        if [ $current_line -gt $total_lines ]; then
+                            current_line=2
+                        fi
+                        
+                        sample_id=$(sed -n "${current_line}p" "$GENOME_CRISPR_CSV" | awk -F',' '{print $1}' | xargs)
+                        
+                        found=false
+                        for selected in "${selected_ids[@]}"; do
+                            if [ "$selected" = "$sample_id" ]; then
+                                found=true
+                                break
+                            fi
+                        done
+                        
+                        if [ "$found" = false ]; then
+                            selected_ids+=("$sample_id")
+                            break
+                        fi
+                        
+                        if [ $current_line -eq $random_line_num ]; then
+                            break
+                        fi
+                    done
+                fi
+                attempts=$((attempts + 1))
+            done
+            
+            IDS=$(printf "%s " "${selected_ids[@]}")
+        fi
+        
         IDS=$(echo "$IDS" | xargs)
         echo "  ▸ Selected random IDs: $IDS"
+    else
+        NUM_SAMPLES=$(( $(echo "$IDS" | tr -cd ' ' | wc -c) + 1 ))
     fi
+    echo "  ▸ Running through $NUM_SAMPLES samples"
 }
 
 get_random_id_sample() {
@@ -198,34 +240,45 @@ get_random_id_sample() {
 }
 
 download_genomes() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP $1: Downloading genomes"
-    echo "----------------------------------------------------"
-
     local success_count=0
     local total_count=0
     local successful_ids=""
-    for id in $IDS; do
+    local pids=()
+    local id_array=($BUCKET_IDS)
+
+    for id in $BUCKET_IDS; do
         if [ -n "$id" ]; then
             ((total_count++))
-
-            if download_single_genome "$id"; then
-                echo "  ▸ Successfully downloaded genome for ID: $id"
-
-                ((success_count++))
-
-                successful_ids="$successful_ids $id"
-            else
-                echo "  ▸ Failed to download genome for ID: $id"
-            fi
+            (
+                if download_single_genome "$id" 2>/dev/null; then
+                    exit 0
+                else
+                    exit 1
+                fi
+            ) &
+            pids+=($!)
         fi
     done
 
-    IDS=$(echo "$successful_ids" | xargs)
+    local i=0
+    for pid in "${pids[@]}"; do
+        wait "$pid"
+        if [ $? -eq 0 ]; then
+            ((success_count++))
+            successful_ids="$successful_ids ${id_array[$i]}"
+        fi
+        ((i++))
+    done
 
-    echo ""
-    echo "Download summary: ${success_count}/${total_count} genomes downloaded successfully."
+    BUCKET_IDS=$(echo "$successful_ids" | xargs)
+
+    if [ "$success_count" -ne 0 ]; then
+        echo "    ▸ ✔️  Downloaded ${success_count}/${total_count} genomes"
+        return 0
+    else
+        echo "    ▸ ❌  Downloaded ${success_count}/${total_count} genomes"
+        return 1
+    fi
 }
 
 download_single_genome() {
@@ -250,8 +303,8 @@ download_single_genome() {
 
     # Download full fasta file
     local fasta_file
-    if datasets download genome accession "$genbank" --include genome --filename $genome_zip; then
-        if unzip -q "${genome_zip}" -d "$genome_tmp_unzipped_folder"; then
+    if datasets download genome accession "$genbank" --include genome --filename $genome_zip >/dev/null 2>&1; then
+        if unzip -q "${genome_zip}" -d "$genome_tmp_unzipped_folder" >/dev/null 2>&1; then
             rm -f "${genome_zip}"
 
             fasta_file=$(find "$genome_tmp_unzipped_folder" -name "*.fna" -o -name "*.fasta" -o -name "*.fa" | head -n 1)
@@ -281,16 +334,14 @@ download_single_genome() {
         return 1
     fi
 
-    # Extract only relevant portion of fasta file based on description
+    # Extract only relevant portion of fasta file based on description (case-insensitive)
     local best_match_header
-    best_match_header=$(grep "^>" "$fasta_file" | grep -i "$genome_description" | head -n 1)
+    best_match_header=$(grep -i "^>" "$fasta_file" | grep -i "$genome_description" | head -n 1)
     
-    # If no exact match, try partial matching with individual words
     if [ -z "$best_match_header" ]; then
-        # Split description into words and try fuzzy matching
         for word in $genome_description; do
-            if [ ${#word} -gt 2 ]; then  # Only use words longer than 2 characters
-                best_match_header=$(grep "^>" "$fasta_file" | grep -i "$word" | head -n 1)
+            if [ ${#word} -gt 2 ]; then
+                best_match_header=$(grep -i "^>" "$fasta_file" | grep -i "$word" | head -n 1)
                 if [ -n "$best_match_header" ]; then
                     break
                 fi
@@ -300,7 +351,10 @@ download_single_genome() {
     
     if [ -z "$best_match_header" ]; then
         best_match_header=$(grep "^>" "$fasta_file" | head -n 1)
-        echo "Warning: No matching sequence found for description '$genome_description', using first sequence"
+        # echo "Warning: No matching sequence found for description '$genome_description', using first sequence"
+        # echo "All sequence headers in $fasta_file:"
+        # grep "^>" "$fasta_file"
+        # echo "Comparing genome_description: '$genome_description'"
     fi
     
     if [ -n "$best_match_header" ]; then
@@ -316,7 +370,7 @@ download_single_genome() {
         fi
         
         if [ -s "$genome_file" ] && grep -q "^>" "$genome_file"; then
-            rm -rf "${genome_tmp_unzipped_folder}"
+            rm -rf "$genome_tmp_unzipped_folder"
 
             return 0
         else
@@ -373,42 +427,53 @@ find_row_of_id() {
 }
 
 extract_crispr_sequences() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP $1: Extracting CRISPR sequences"
-    echo "----------------------------------------------------"
-
     local success_count=0
     local total_count=0
     local successful_ids=""
-    for id in $IDS; do
+    local pids=()
+    local id_array=($BUCKET_IDS)
+
+    for id in $BUCKET_IDS; do
         if [ -n "$id" ]; then
             ((total_count++))
-
-            if extract_crispr_all_crispr_sequences "$id"; then
-                echo "  ▸ Successfully extracted crispr sequence for ID: $id"
-
-                ((success_count++))
-
-                successful_ids="$successful_ids $id"
-            else
-                echo "  ▸ Failed to extract crispr sequence for ID: $id"
-            fi
+            (
+                if extract_single_crispr_sequences "$id" 2>/dev/null; then
+                    exit 0
+                else
+                    exit 1
+                fi
+            ) &
+            pids+=($!)
         fi
     done
 
-    IDS=$(echo "$successful_ids" | xargs)
+    local i=0
+    for pid in "${pids[@]}"; do
+        wait "$pid"
+        if [ $? -eq 0 ]; then
+            ((success_count++))
+            successful_ids="$successful_ids ${id_array[$i]}"
+        fi
+        ((i++))
+    done
 
-    echo ""
-    echo "Extract summary: ${success_count}/${total_count} genomes crispr sequences extracted successfully."
+    BUCKET_IDS=$(echo "$successful_ids" | xargs)
+
+    if [ "$success_count" -ne 0 ]; then
+        echo "    ▸ ✔️  Extracted ${success_count}/${total_count} CRISPR sequences"
+        return 0
+    else
+        echo "    ▸ ❌  Extracted ${success_count}/${total_count} CRISPR sequences"
+        return 1
+    fi
 }
 
-extract_crispr_all_crispr_sequences() {
+extract_single_crispr_sequences() {
     local id="$1"
     local genome_file="${GENOMES_FOLDER}/${id}.fasta"
 
     if [ -f "$genome_file" ]; then
-        local $genome_sequence
+        local genome_sequence
         if genome_sequence=$(grep -v ">" "$genome_file" | tr -d '\n'); then
             local crispr_regions
             if crispr_regions=$(extract_crispr_region_from_csv "$id"); then
@@ -457,34 +522,45 @@ extract_crispr_region_from_csv() {
 }
 
 reduce_genomes_to_crispr_region() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP QUICK: Reduce genome to only relevant regions"
-    echo "----------------------------------------------------"
-
     local success_count=0
     local total_count=0
     local successful_ids=""
-    for id in $IDS; do
+    local pids=()
+    local id_array=($BUCKET_IDS)
+
+    for id in $BUCKET_IDS; do
         if [ -n "$id" ]; then
             ((total_count++))
-
-            if reduce_single_genome_to_crispr_region "$id"; then
-                echo "  ▸ Successfully reduced genome for ID: $id"
-
-                ((success_count++))
-
-                successful_ids="$successful_ids $id"
-            else
-                echo "  ▸ Failed to reduce genome for ID: $id"
-            fi
+            (
+                if reduce_single_genome_to_crispr_region "$id" 2>/dev/null; then
+                    exit 0
+                else
+                    exit 1
+                fi
+            ) &
+            pids+=($!)
         fi
     done
 
-    IDS=$(echo "$successful_ids" | xargs)
+    local i=0
+    for pid in "${pids[@]}"; do
+        wait "$pid"
+        if [ $? -eq 0 ]; then
+            ((success_count++))
+            successful_ids="$successful_ids ${id_array[$i]}"
+        fi
+        ((i++))
+    done
 
-    echo ""
-    echo "Reduction summary: ${success_count}/${total_count} reductions ran successful."
+    BUCKET_IDS=$(echo "$successful_ids" | xargs)
+
+    if [ "$success_count" -ne 0 ]; then
+        echo "    ▸ ✔️  Reduced ${success_count}/${total_count} genomes"
+        return 0
+    else
+        echo "    ▸ ❌  Reduced ${success_count}/${total_count} genomes"
+        return 1
+    fi
 }
 
 reduce_single_genome_to_crispr_region() {
@@ -493,7 +569,7 @@ reduce_single_genome_to_crispr_region() {
     local padding_to_include_surrounding_crispr_region=10000
 
     local full_genome_file_backup="${GENOMES_FOLDER}/${id}_full_genome.fasta"
-    cp "$genome_file" "$full_genome_file_backup"
+    cp "$genome_file" "$full_genome_file_backup" >/dev/null 2>&1
 
     if [ ! -f "$genome_file" ]; then
         echo "Error: Genome file '$genome_file' does not exist for ID: $id"
@@ -536,34 +612,45 @@ reduce_single_genome_to_crispr_region() {
 }
 
 generate_artificial_reads() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP $1: Generate artificial reads"
-    echo "----------------------------------------------------"
-
     local success_count=0
     local total_count=0
     local successful_ids=""
-    for id in $IDS; do
+    local pids=()
+    local id_array=($BUCKET_IDS)
+
+    for id in $BUCKET_IDS; do
         if [ -n "$id" ]; then
             ((total_count++))
-
-            if generate_artificial_reads_for_id "$id"; then
-                echo "  ▸ Successfully generated reads for ID: $id, and total_count is at $total_count"
-
-                ((success_count++))
-
-                successful_ids="$successful_ids $id"
-            else
-                echo "  ▸ Failed to generate reads for ID: $id"
-            fi
+            (
+                if generate_artificial_reads_for_id "$id" 2>/dev/null; then
+                    exit 0
+                else
+                    exit 1
+                fi
+            ) &
+            pids+=($!)
         fi
     done
 
-    IDS=$(echo "$successful_ids" | xargs)
+    local i=0
+    for pid in "${pids[@]}"; do
+        wait "$pid"
+        if [ $? -eq 0 ]; then
+            ((success_count++))
+            successful_ids="$successful_ids ${id_array[$i]}"
+        fi
+        ((i++))
+    done
 
-    echo ""
-    echo "Generation summary: ${success_count}/${total_count} generations ran successful."
+    BUCKET_IDS=$(echo "$successful_ids" | xargs)
+
+    if [ "$success_count" -ne 0 ]; then
+        echo "    ▸ ✔️  Generated ${success_count}/${total_count} reads"
+        return 0
+    else
+        echo "    ▸ ❌  Generated ${success_count}/${total_count} reads"
+        return 1
+    fi
 }
 
 generate_artificial_reads_for_id() {
@@ -590,17 +677,12 @@ generate_artificial_reads_for_id() {
             return 1
         fi
     fi
+    if [ "$n_reads" -le 0 ]; then
+        echo "Failed trying to generate $n_reads reads"
+        return 1
+    fi
 
-    # local coverage_file="${READS_FOLDER}/${id}_coverage.txt"
-
-    # > "$coverage_file"
-
-    # grep '^>' "$genome_file" | sed -E 's/^>([^[:space:]]*).*/\1/' | while read genome_id_name; do
-    #     echo "$genome_id_name 30" >> "$coverage_file"
-    # done
-
-    # if iss generate --genomes "$genome_file" --model novaseq --coverage_file $coverage_file --output "$reads_prefix" --cpus 1; then
-    if iss generate --genomes "$genome_file" --model hiseq --n_reads $n_reads --output "$reads_prefix" --cpus 1; then
+    if iss generate --genomes "$genome_file" --model hiseq --n_reads $n_reads --output "$reads_prefix" --cpus 1 >/dev/null 2>&1; then
         local vcf_pattern="${reads_prefix}*.vcf"
         if compgen -G "$vcf_pattern" > /dev/null 2>&1; then
             rm -f $vcf_pattern
@@ -611,12 +693,8 @@ generate_artificial_reads_for_id() {
             rm -f $txt_pattern
         fi
 
-        rm -f "$coverage_file"
-
         return 0
     else
-        rm -f "$coverage_file"
-
         echo "Failed to execute iss generate command"
         return 1
     fi
@@ -635,34 +713,30 @@ extract_genome_size() {
 }
 
 run_mcaat_benchmark() {
-    echo ""
-    echo "----------------------------------------------------"
-    echo "🔸STEP $1: Run mcaat benchmark"
-    echo "----------------------------------------------------"
-
     local success_count=0
     local total_count=0
     local successful_ids=""
-    for id in $IDS; do
+
+    for id in $BUCKET_IDS; do
         if [ -n "$id" ]; then
             ((total_count++))
 
             if run_single_mcaat_benchmark "$id"; then
-                echo "  ▸ Successfully ran benchmark for ID: $id"
-
                 ((success_count++))
-
                 successful_ids="$successful_ids $id"
-            else
-                echo "  ▸ Failed to run benchmark for ID: $id"
             fi
         fi
     done
 
-    IDS=$(echo "$successful_ids" | xargs)
+    BUCKET_IDS=$(echo "$successful_ids" | xargs)
 
-    echo ""
-    echo "Generation summary: ${success_count}/${total_count} generations ran successful."
+    if [ "$success_count" -ne 0 ]; then
+        echo "    ▸ ✔️  Generated ${success_count}/${total_count} reads"
+        return 0
+    else
+        echo "    ▸ ❌  Generated ${success_count}/${total_count} reads"
+        return 1
+    fi
 }
 
 run_single_mcaat_benchmark() {
@@ -672,9 +746,7 @@ run_single_mcaat_benchmark() {
     local crispr_sequences_file="${EXPECTED_CRISPRS_FOLDER}/${id}.txt"
     local result_file="${RESULTS_FOLDER}/${id}.txt"
 
-    > "$result_file"
-
-    if "$MCAAT_BINARY" --input-files "$r1_file" "$r2_file" --ram "$RAM" --threads "$THREADS" --benchmark "$crispr_sequences_file" 2>&1 | tee "$result_file"; then
+    if "$MCAAT_BINARY" --input-files "$r1_file" "$r2_file" --ram "$RAM" --threads "$THREADS" --benchmark "$crispr_sequences_file" > "$result_file" 2>&1; then
         return 0
     else
         echo "Failed to execute mcaat binary with arguments"
@@ -683,19 +755,47 @@ run_single_mcaat_benchmark() {
 }
 
 main() {
-    verify_requirements "1/7"
-    verify_arguments "2/7" "$@"
-    setting_up_environment "3/7"
+    echo "----------------------------------------------------"
+    echo "🔹SETUP🔹"
+    echo "----------------------------------------------------"
 
-    download_genomes "4/7"
-    extract_crispr_sequences "5/7"
+    verify_requirements
+    verify_arguments "$@"
+    setting_up_environment
+
+    echo ""
+    echo "----------------------------------------------------"
+    echo "🔹RUN🔹"
+    echo "----------------------------------------------------"
+    
+    local samples_done=0
+    local max_bucket_size=1
     if [ "$QUICK" = true ]; then
-        reduce_genomes_to_crispr_region
+        max_bucket_size=$THREADS
     fi
 
-    generate_artificial_reads "6/7"
+    while [ $samples_done -lt $NUM_SAMPLES ]; do
+        local bucket_size=$((max_bucket_size > NUM_SAMPLES - samples_done ? NUM_SAMPLES - samples_done : max_bucket_size))
+        BUCKET_IDS=$(echo "$IDS" | cut -d' ' -f$((samples_done + 1))-$((samples_done + bucket_size)))
 
-    run_mcaat_benchmark "7/7"
+        if [ "$bucket_size" -eq 1 ]; then
+            echo "  ▸ Running id: $BUCKET_IDS"
+        else
+            echo "  ▸ Running Bucket $((samples_done + bucket_size))/$NUM_SAMPLES, using ids: $BUCKET_IDS"
+        fi
+
+        download_genomes || continue
+        extract_crispr_sequences || continue
+        
+        if [ "$QUICK" = true ]; then
+            reduce_genomes_to_crispr_region || continue
+        fi
+        
+        generate_artificial_reads || continue
+        run_mcaat_benchmark
+        
+        samples_done=$((samples_done + bucket_size))
+    done
 }
 
 main "$@"
