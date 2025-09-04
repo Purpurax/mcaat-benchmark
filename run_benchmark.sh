@@ -109,7 +109,7 @@ verify_arguments() {
             --ids)
                 shift
                 while [ "$#" -gt 0 ] && [[ "$1" != --* ]]; do
-                    IDS="$IDS $1"
+                    IDS="${IDS:+$IDS }$1"
                     shift
                 done
                 echo "    ▸ Benchmarking ids $IDS"
@@ -790,6 +790,8 @@ main() {
         else
             echo "  ▸ Running Bucket $((samples_done + bucket_size))/$NUM_SAMPLES, using ids: $BUCKET_IDS"
         fi
+        
+        samples_done=$((samples_done + bucket_size))
 
         download_genomes || continue
         extract_crispr_sequences || continue
@@ -800,8 +802,6 @@ main() {
         
         generate_artificial_reads || continue
         run_mcaat_benchmark
-        
-        samples_done=$((samples_done + bucket_size))
     done
 
     echo "------------------------DONE------------------------"
