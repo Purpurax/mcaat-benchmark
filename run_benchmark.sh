@@ -18,25 +18,9 @@ usage() {
     echo "  --threads <count>       Number of threads. Default: 2"
     echo "  --output_folder <path>  Output directory for results"
     echo "  --quick                 Benchmark using a reduced genome"
+    echo "  --reuse                 Benchmarks using the existing reads from the folder"
     echo "  --ids <n_samples> || <id1> [id2 ...]   Space-separated IDs for benchmarking, or a number of random samples"
     echo ""
-}
-
-verify_requirements() {
-    if ! command -v unzip >/dev/null 2>&1; then
-        echo "Error: 'unzip' not found, please install over apt-get install unzip"
-        exit 1
-    fi
-
-    if ! command -v datasets >/dev/null 2>&1; then
-        echo "Error: 'datasets' not found, please install on https://github.com/ncbi/datasets"
-        exit 1
-    fi
-
-    if ! command -v iss >/dev/null 2>&1; then
-        echo "Error: 'iss' not found, please install on https://github.com/HadrienG/InSilicoSeq"
-        exit 1
-    fi
 }
 
 verify_arguments() {
@@ -66,6 +50,7 @@ verify_arguments() {
     THREADS=2
     OUTPUT_FOLDER="benchmark"
     QUICK=false
+    REUSE=false
     IDS=""
 
     shift 2
@@ -106,6 +91,11 @@ verify_arguments() {
                 echo "    ▸ Quick mode enabled"
                 shift
                 ;;
+            --reuse)
+                REUSE=true
+                echo "    ▸ Reuse mode enabled"
+                shift
+                ;;
             --ids)
                 shift
                 while [ "$#" -gt 0 ] && [[ "$1" != --* ]]; do
@@ -122,8 +112,25 @@ verify_arguments() {
         esac
     done
 
-    if [ -z "$IDS" ]; then
+    if [ "$REUSE" = false ] && [ -z "$IDS" ]; then
         echo "Error: No ID specified. Please provide at least one ID using --ids."
+        exit 1
+    fi
+}
+
+verify_requirements() {
+    if [ "$REUSE" = false ] && ! command -v unzip >/dev/null 2>&1; then
+        echo "Error: 'unzip' not found, please install over apt-get install unzip"
+        exit 1
+    fi
+
+    if [ "$REUSE" = false ] && ! command -v datasets >/dev/null 2>&1; then
+        echo "Error: 'datasets' not found, please install on https://github.com/ncbi/datasets"
+        exit 1
+    fi
+
+    if [ "$REUSE" = false ] && ! command -v iss >/dev/null 2>&1; then
+        echo "Error: 'iss' not found, please install on https://github.com/HadrienG/InSilicoSeq"
         exit 1
     fi
 }
@@ -218,6 +225,35 @@ setting_up_environment() {
     else
         NUM_SAMPLES=$(( $(echo "$IDS" | tr -cd ' ' | wc -c) + 1 ))
     fi
+
+    if [ "$REUSE" = true ]; then
+        if [ ! -d "$READS_FOLDER" ]; then
+            echo "Error: Reads folder '$READS_FOLDER' does not exist. Cannot reuse reads."
+            exit 1
+        fi
+        
+        local available_ids=""
+        for r1_file in "$READS_FOLDER"/*_reads_R1.fastq; do
+            if [ -f "$r1_file" ]; then
+                local base_name=$(basename "$r1_file" _reads_R1.fastq)
+                local r2_file="${READS_FOLDER}/${base_name}_reads_R2.fastq"
+                local crispr_file="${EXPECTED_CRISPRS_FOLDER}/${base_name}.txt"
+                if [ -f "$r2_file" ] && [ -f "$crispr_file" ]; then
+                    available_ids="${available_ids:+$available_ids }$base_name"
+                fi
+            fi
+        done
+        
+        if [ -z "$available_ids" ]; then
+            echo "Error: No valid read pairs with corresponding CRISPR sequence files found in '$READS_FOLDER'."
+            exit 1
+        fi
+        
+        IDS="$available_ids"
+        NUM_SAMPLES=$(echo "$IDS" | wc -w)
+        echo "  ▸ Found existing reads for IDs: $IDS"
+    fi
+    
     echo "  ▸ Running through $NUM_SAMPLES samples"
 }
 
@@ -762,8 +798,8 @@ main() {
     echo "🔹SETUP🔹"
     echo "----------------------------------------------------"
 
-    verify_requirements
     verify_arguments "$@"
+    verify_requirements
     setting_up_environment
 
     echo ""
@@ -793,14 +829,17 @@ main() {
         
         samples_done=$((samples_done + bucket_size))
 
-        download_genomes || continue
-        extract_crispr_sequences || continue
-        
-        if [ "$QUICK" = true ]; then
-            reduce_genomes_to_crispr_region || continue
+        if [ "$REUSE" = false ]; then
+            download_genomes || continue
+            extract_crispr_sequences || continue
+            
+            if [ "$QUICK" = true ]; then
+                reduce_genomes_to_crispr_region || continue
+            fi
+            
+            generate_artificial_reads || continue
         fi
         
-        generate_artificial_reads || continue
         run_mcaat_benchmark
     done
 

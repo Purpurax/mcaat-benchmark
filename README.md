@@ -117,6 +117,7 @@ You'll need the binary executable for the benchmarking process.
 - `--threads <count>`: Number of threads to use. Default: 2
 - `--output_folder <path>`: Output directory for results. Default: "benchmark"
 - `--quick`: Enable quick mode (uses reduced genome regions around CRISPR arrays)
+- `--reuse`: Use the reads and crispr sequences that are in the corresponding folders
 
 ### Example Usage
 #### Benchmark Specific Genomes
